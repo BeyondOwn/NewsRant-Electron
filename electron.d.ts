@@ -4,10 +4,14 @@ declare global {
     electron: {
       ipcRenderer: {
         send: (channel: string, ...args: any[]) => void;
-        // Define other ipcRenderer methods you use here
+        minimizeWindow: () =>void;
+        closeWindow: () =>void;
+        maximizeWindow: ()=>void;
+        getWindowState: ()=>{isMaximized:boolean,isMinimized:boolean,isFullScreen:boolean} | null;
       };
     };
   }
 }
 
-export {};
+export { };
+
