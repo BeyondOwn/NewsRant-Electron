@@ -1,8 +1,60 @@
 import { is } from "@electron-toolkit/utils";
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
+import { autoUpdater } from "electron-updater";
 import { startServer } from "next/dist/server/lib/start-server";
 import { join } from "path";
 import url from "url";
+
+export function setupAutoUpdater(mainWindow: BrowserWindow) {
+  // Disable auto downloading
+  autoUpdater.autoDownload = false;
+
+  // Check for updates
+  autoUpdater.checkForUpdates();
+
+  // Update available
+  autoUpdater.on('update-available', () => {
+    mainWindow.webContents.send('update-status', {
+      status: 'available',
+      message: 'Update available'
+    });
+  });
+
+  // Download progress
+  autoUpdater.on('download-progress', (progressObj) => {
+    mainWindow.webContents.send('update-status', {
+      status: 'downloading',
+      message: 'Downloading update...',
+      progress: progressObj
+    });
+  });
+
+  // Update downloaded
+  autoUpdater.on('update-downloaded', () => {
+    mainWindow.webContents.send('update-status', {
+      status: 'downloaded',
+      message: 'Update downloaded'
+    });
+    // Wait a bit before restarting
+    setTimeout(() => {
+      autoUpdater.quitAndInstall();
+    }, 2000);
+  });
+
+  // Error handling
+  autoUpdater.on('error', (err) => {
+    mainWindow.webContents.send('update-status', {
+      status: 'error',
+      message: 'Error during update',
+      error: err.message
+    });
+  });
+
+  // Handle update start request from renderer
+  ipcMain.handle('start-update', () => {
+    autoUpdater.downloadUpdate();
+  });
+}
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
@@ -17,15 +69,15 @@ const createWindow = () => {
   });
 
     // Intercept navigation within the app
-  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    console.log('Navigating to:', navigationUrl);
+  // mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+  //   console.log('Navigating to:', navigationUrl);
 
-    // Check if the navigation URL is external
-    if (isExternalLink(navigationUrl)) {
-      event.preventDefault();  // Prevent navigation inside the app
-      shell.openExternal(navigationUrl); // Open external URLs in the default browser
-    }
-  });
+  //   // Check if the navigation URL is external
+  //   if (isExternalLink(navigationUrl)) {
+  //     event.preventDefault();  // Prevent navigation inside the app
+  //     shell.openExternal(navigationUrl); // Open external URLs in the default browser
+  //   }
+  // });
 
 
 
@@ -46,6 +98,7 @@ const createWindow = () => {
   };
 
   loadURL();
+  setupAutoUpdater(mainWindow);
   return mainWindow;
 };
 
@@ -71,6 +124,27 @@ const startNextJSServer = async () => {
     throw error;
   }
 };
+
+// Handle update checking
+ipcMain.handle('check-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return {
+      updateAvailable: result?.updateInfo?.version !== app.getVersion(),
+      currentVersion: app.getVersion(),
+      updateInfo: result?.updateInfo
+    };
+  } catch (error:any) {
+    console.error('Update check failed:', error);
+    return {
+      error: error.message,
+      currentVersion: app.getVersion()
+    };
+  }
+});
+
+
+
 
 ipcMain.handle('get-window-state', () => {
   const focusedWindow = BrowserWindow.getFocusedWindow();
@@ -108,6 +182,7 @@ ipcMain.on('close-window', () => {
   if (win) win.close();
 });
 
+
 app.whenReady().then(() => {
   createWindow();
 
@@ -115,12 +190,14 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
+ 
+  
+
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
-
+});
 
 function isExternalLink(navigationUrl) {
   // Parse the URL

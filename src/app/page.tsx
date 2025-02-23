@@ -2,6 +2,7 @@
 import { SearchForm } from '@/components/InputForm';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import UpdatePrompt from '@/components/UpdatePrompt';
 import api from '@/lib/axios';
 import { useAuth } from '@/lib/context';
 import timeAgo from '@/lib/timeAgo';
@@ -23,6 +24,44 @@ export default function Home() {
   // const [bookmarkedArticles, setBookmarkedArticles] = useState<Record<number,boolean>>({});
   const { user, loading } = useAuth(); // Access user from the context
   const queryClient = useQueryClient();
+
+  useEffect(()=>{
+    if(window.electron){
+      window.electron.ipcRenderer.on("update-not-available", (event,message)=>{
+        console.log(message);
+      })
+    }
+  
+    if(window.electron){
+      window.electron.ipcRenderer.on("update-available", (event,message)=>{
+        console.log(message);
+      })
+    }
+
+    if(window.electron){
+      window.electron.ipcRenderer.on("update-status", (event,message)=>{
+        console.log(message);
+      })
+    }
+  },[])
+  
+
+
+  async function handleCheckUpdates() {
+      try {
+        const result = await window.electron.ipcRenderer.checkUpdates();
+        console.log(result);
+
+        if (result.updateInfo) {
+          console.log('Update available:', result.updateInfo);
+          // Trigger download or show update dialog
+        } else {
+          console.log('No updates available');
+        }
+      } catch (error) {
+        console.error('Error checking updates:', error);
+      }
+  };
 
   // const toggleBookmark = (articleId:number) => {
   //   setBookmarkedArticles(prevState => ({
@@ -323,7 +362,8 @@ useEffect(() => {
 
   return (
     <div className="flex justify-center">
-      <ul className="xl:grid xl:grid-cols-3 w-[80%] mt-4 scrollbar-thin scrolla">
+      <UpdatePrompt/>
+      <ul className=" xl:grid xl:grid-cols-3 w-[80%] mt-4 scrollbar-thin scrolla">
       <SearchForm
           searchMessage={searchMessage}
           setSearchMessage={(value) => {
@@ -363,10 +403,8 @@ useEffect(() => {
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
-     
 
         <div className='col-span-2 flex flex-col'>
-
         {isFetching && <div>Loading...</div>} {/* Subtle loading indicator */}
         {filteredArticles?.map((article) => (
           <li className="col-span-2 mb-4" key={article.id}>
@@ -400,7 +438,7 @@ useEffect(() => {
                 </p>
                 <div className='flex flex-row gap-2 mt-auto items-center'>
                   <span>By</span>
-                  <p className='font-extrabold'>{article.author}</p> 
+                  <p className='font-extrabold text-blue-500'>{article.author}</p> 
                   <p>{timeAgo(article.date)}</p>
                   {article.isBookmarked ? (
                     <BookmarkCheck 
@@ -437,9 +475,9 @@ useEffect(() => {
         <p className='text-3xl font-extrabold mb-1'>Trending</p>
         {trendings?.map((trending,index)=>
         <div className='mb-1 flex text-lg font-roboto font-bold ' key={trending.id}>
-        <div className='px-2 border-2 mr-1 border-primary w-8 place-items-center'>
-          <p>{index+1}</p>
-        </div>
+         <div className="w-8 h-8 border-2 border-primary mr-1 flex items-center justify-center">
+            <span>{index + 1}</span>
+          </div>
         <Link href={trending.link}>
         <p className='max-w-[2rem] hover:underline'>{trending.title}</p>
         </Link>
@@ -449,8 +487,8 @@ useEffect(() => {
       <p className='text-3xl font-extrabold mb-1 mt-4'>Upcoming Movies</p>
         {upcomings?.map((upcoming,index)=>
         <div className='mb-1 flex text-lg font-roboto font-bold ' key={upcoming.id}>
-          <div className='px-2 border-2 mr-1 border-primary w-8 place-items-center'>
-            <p>{index+1}</p>
+          <div className="w-8 h-8 border-2 border-primary mr-1 flex items-center justify-center">
+            <span>{index + 1}</span>
           </div>
           <Link href={upcoming.link}>
           <p className='max-w-[2rem] hover:underline'>{upcoming.title}</p>
